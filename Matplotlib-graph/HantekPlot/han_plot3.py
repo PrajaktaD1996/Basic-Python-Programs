@@ -1,0 +1,95 @@
+#han_plot3.py
+##hantek signal plot
+#Real time Hantek signals:::::::::::
+
+#import numpy as np
+#import matplotlib.pyplot as plt
+#import matplotlib.animation as animation
+
+#fig, ax = plt.subplots()
+
+#max_x = 5
+#max_rand = 10
+
+#x = np.arange(0, max_x)
+#ax.set_ylim(0, max_rand)
+#line, = ax.plot(x, np.random.randint(0, max_rand, max_x))
+
+#def init():  # give a clean slate to start
+    #line.set_ydata([np.nan] * len(x))
+    #return line,
+
+#def animate(i):  # update the y values (every 1000ms)
+    #line.set_ydata(np.random.randint(0, max_rand, max_x))
+    #return line,
+
+#ani = animation.FuncAnimation(fig, animate, init_func=init, interval=1000, blit=True, save_count=10)
+
+#plt.show()
+
+#######################another program 
+
+
+
+from PyHT6022.LibUsbScope import Oscilloscope
+import numpy as np
+import matplotlib.pyplot as plt
+import pylab
+import time
+import sys
+
+def apply_data_smoothing(data, window=1):
+    new_data = data[:window]
+    for i, point in enumerate(data[window:-window]):
+        new_data.append(sum(data[i-window:i+window+1])/(2*window+1))
+    new_data.extend(data[-window:])
+    return new_data
+
+
+sample_rate_index = 1
+voltage_range = 0x01
+cal_freq = 10
+
+# skip first samples due to unstable xfer
+skip = 2 * 0x400
+data_points = skip + 20 * 0x400
+
+scope = Oscilloscope()
+scope.setup()
+scope.open_handle() 
+scope.set_sample_rate(sample_rate_index)
+scope.set_ch1_voltage_range(voltage_range)
+scope.set_ch1_ac_dc( scope.DC )
+scope.set_calibration_frequency( cal_freq )
+    
+time.sleep( 1 )
+    
+ch1_data, _ = scope.read_data(data_points)#,raw=True)#timeout=1)
+
+voltage_data = scope.scale_read_data(ch1_data[skip:], voltage_range)
+timing_data, _ = scope.convert_sampling_rate_to_measurement_times(data_points-skip, sample_rate_index)
+scope.close_handle()
+
+if len(timing_data) != len(voltage_data):
+    w = sys.stderr.write
+    w('data lengths differ!\n')
+    w(str([(s,len(eval(s+'_data')))for s in 'timing voltage'.split()]))
+    w('\n')
+    exit(1)
+
+# store the data
+with open('/tmp/scopevis.dat', 'wt') as ouf:
+    ouf.write('\n'.join('{:8f}'.format(v) for v in voltage_data))
+    ouf.write('\n')
+
+pylab.title('Scope Visualization Example')
+pylab.plot(timing_data, voltage_data, color='#009900', label='Raw Trace')
+pylab.plot(timing_data, apply_data_smoothing(voltage_data, window=3), color='#0033CC', label='Smoothed Trace')
+pylab.xlabel('Time (s)')
+pylab.ylabel('Voltage (V)')
+pylab.grid()
+pylab.legend(loc='best')
+pylab.xticks(rotation=30)
+pylab.tight_layout()
+pylab.show()
+
