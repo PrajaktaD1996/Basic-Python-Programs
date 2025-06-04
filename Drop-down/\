@@ -1,0 +1,12 @@
+from kivymd.app import MDApp
+from kivy.lang import Builder 
+from kivy.uix.floatlayout import FloatLayout
+
+
+class demo(FloatLayout):
+    pass
+
+class Main(MDApp):
+    def build(self):
+        return demo()
+Main().run()
